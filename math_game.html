@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>K2 數字規律遊戲</title>
+    <style>
+        :root {
+            --primary-color: #4A90E2;
+            --success-color: #FF0000; /* Red for circling like a teacher/marking */
+            --error-color: #999;
+            --bg-color: #F0F4F8;
+            --card-bg: #FFFFFF;
+        }
+
+        body {
+            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overscroll-behavior: none;
+            user-select: none; /* Prevent text selection */
+            -webkit-user-select: none;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        .home-btn {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: none; /* Hidden by default on menu */
+        }
+
+        .container {
+            max-width: 800px;
+            width: 95%;
+            margin: 20px auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Menu Screen Styles */
+        #menu-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .menu-btn {
+            background-color: white;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 20px 40px;
+            margin: 15px;
+            border-radius: 15px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 80%;
+            max-width: 300px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .menu-btn:active {
+            transform: scale(0.95);
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Game Screen Styles */
+        #game-container {
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background-color: #E0E0E0;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .question-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            text-align: center;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative; /* For canvas positioning */
+        }
+
+        /* Canvas Overlay */
+        #draw-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5; /* Above options */
+            touch-action: none; /* Disable scrolling on canvas */
+            cursor: crosshair;
+            border-radius: 20px;
+        }
+
+        .question-title {
+            font-size: 1.4rem;
+            color: #333;
+            margin-bottom: 30px;
+            line-height: 1.4;
+            font-weight: bold;
+            pointer-events: none; /* Let clicks pass through */
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+            pointer-events: none; /* Disable direct interaction, rely on canvas */
+        }
+
+        /* iPad Specific */
+        @media (min-width: 768px) {
+            .options-grid {
+                gap: 40px;
+            }
+            .option-btn {
+                font-size: 2rem;
+                padding: 40px 20px;
+            }
+        }
+
+        .option-btn {
+            background: white;
+            border: 2px solid #000; /* Black border like worksheet */
+            padding: 20px 10px;
+            font-size: 1.5rem;
+            color: #000;
+            cursor: pointer; /* Keep cursor for visual */
+            transition: all 0.2s;
+            font-weight: normal;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            position: relative;
+            box-sizing: border-box;
+        }
+        
+        /* Vertical lines separator simulation for the worksheet look */
+        .option-btn span {
+            position: relative;
+            flex: 1;
+            text-align: center;
+        }
+        
+        .option-btn span:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 10%;
+            height: 80%;
+            width: 1px;
+            background-color: #ccc;
+        }
+
+        /* Circling Effect (System Feedback) */
+        .option-btn.correct::before {
+            content: "";
+            position: absolute;
+            top: -15px;
+            left: -10px;
+            right: -10px;
+            bottom: -15px;
+            border: 5px solid #FF0000; /* Red circle */
+            border-radius: 50% 50%;
+            pointer-events: none;
+            animation: drawCircle 0.4s ease-out forwards;
+            z-index: 4;
+        }
+
+        @keyframes drawCircle {
+            from {
+                clip-path: inset(0 100% 0 0);
+            }
+            to {
+                clip-path: inset(0 0 0 0);
+            }
+        }
+
+        .option-btn.wrong {
+            opacity: 0.5;
+            background-color: #f0f0f0;
+        }
+
+        .feedback-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .feedback-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            width: 80%;
+            max-width: 400px;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .feedback-icon {
+            font-size: 5rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .next-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            margin-top: 20px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .secondary-btn {
+            background-color: white;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            margin-top: 10px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            animation: fall linear forwards;
+            z-index: 999;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(720deg); }
+        }
+
+        #completion-screen {
+            display: none;
+            text-align: center;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+        
+        .star-rating {
+            font-size: 3rem;
+            color: gold;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <button class="home-btn" onclick="showMenu()">🏠 首頁</button>
+        <span id="header-title">K2 數字規律遊戲</span>
+    </header>
+
+    <!-- Menu Screen -->
+    <div class="container" id="menu-screen">
+        <h2 style="color: #333; margin-bottom: 40px;">請選擇練習題目</h2>
+        <button class="menu-btn" onclick="startGame(1)">第一組題目</button>
+        <button class="menu-btn" onclick="startGame(2)">第二組題目</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div class="container" id="game-container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+
+        <div class="question-card" id="card-area">
+            <canvas id="draw-canvas"></canvas>
+            <div class="question-title">
+                以下四組數中，有一組數的規律與其他不同，請<span style="color: #FF0000; border: 2px solid #FF0000; border-radius: 50%; padding: 0 5px;">圈出</span>不同規律的一組數。
+            </div>
+
+            <div class="options-grid" id="options-container">
+                <!-- Options will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Completion Screen -->
+    <div class="container" id="completion-screen">
+        <div class="question-card">
+            <h2 style="font-size: 2rem; color: var(--primary-color);">恭喜完成！</h2>
+            <div class="star-rating">⭐⭐⭐⭐⭐</div>
+            <p style="font-size: 1.5rem;">你真棒！</p>
+            <button class="next-btn" onclick="restartCurrentSet()">再玩一次</button>
+            <button class="secondary-btn" onclick="showMenu()">返回主目錄</button>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div class="feedback-modal" id="feedback-modal">
+        <div class="feedback-content">
+            <span class="feedback-icon" id="feedback-icon">⭕</span>
+            <h2 id="feedback-text">答對了！</h2>
+            <button class="next-btn" id="next-btn-action">下一題</button>
+        </div>
+    </div>
+
+    <script>
+        // Set 1 Questions
+        const questionsSet1 = [
+            {
+                id: 1,
+                options: [
+                    { nums: [1, 2, 3, 4], type: 'asc' },
+                    { nums: [5, 6, 7, 8], type: 'asc' },
+                    { nums: [10, 9, 8, 7], type: 'desc' }, // Different
+                    { nums: [11, 12, 13, 14], type: 'asc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 2,
+                options: [
+                    { nums: [20, 19, 18, 17], type: 'desc' },
+                    { nums: [1, 2, 3, 4], type: 'asc' }, // Different
+                    { nums: [5, 4, 3, 2], type: 'desc' },
+                    { nums: [9, 8, 7, 6], type: 'desc' }
+                ],
+                correctIndex: 1
+            },
+            {
+                id: 3,
+                options: [
+                    { nums: [6, 7, 8, 9], type: 'asc' },
+                    { nums: [10, 11, 12, 13], type: 'asc' },
+                    { nums: [15, 16, 17, 18], type: 'asc' },
+                    { nums: [3, 5, 4, 6], type: 'error' } // Different
+                ],
+                correctIndex: 3
+            },
+            {
+                id: 4,
+                options: [
+                    { nums: [12, 13, 14, 15], type: 'asc' },
+                    { nums: [2, 3, 4, 5], type: 'asc' },
+                    { nums: [10, 9, 8, 7], type: 'desc' }, // Different
+                    { nums: [16, 17, 18, 19], type: 'asc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 5,
+                options: [
+                    { nums: [4, 3, 2, 1], type: 'desc' },
+                    { nums: [10, 9, 8, 7], type: 'desc' },
+                    { nums: [5, 6, 7, 8], type: 'asc' }, // Different
+                    { nums: [15, 14, 13, 12], type: 'desc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 6,
+                options: [
+                    { nums: [1, 3, 2, 4], type: 'error' }, // Different
+                    { nums: [5, 6, 7, 8], type: 'asc' },
+                    { nums: [9, 10, 11, 12], type: 'asc' },
+                    { nums: [17, 18, 19, 20], type: 'asc' }
+                ],
+                correctIndex: 0
+            },            {
+                id: 7,
+                options: [
+                    { nums: [8, 7, 6, 5], type: 'desc' },
+                    { nums: [4, 3, 2, 1], type: 'desc' },
+                    { nums: [11, 12, 13, 14], type: 'asc' }, // Different
+                    { nums: [19, 18, 17, 16], type: 'desc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 8,
+                options: [
+                    { nums: [13, 14, 15, 16], type: 'asc' },
+                    { nums: [1, 2, 3, 4], type: 'asc' },
+                    { nums: [9, 8, 7, 6], type: 'desc' }, // Different
+                    { nums: [5, 6, 7, 8], type: 'asc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 9,
+                options: [
+                    { nums: [10, 9, 8, 7], type: 'desc' },
+                    { nums: [6, 5, 4, 3], type: 'desc' },
+                    { nums: [2, 4, 3, 5], type: 'error' }, // Different
+                    { nums: [15, 14, 13, 12], type: 'desc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 10,
+                options: [
+                    { nums: [7, 8, 9, 10], type: 'asc' },
+                    { nums: [15, 14, 13, 12], type: 'desc' }, // Different
+                    { nums: [2, 3, 4, 5], type: 'asc' },
+                    { nums: [11, 12, 13, 14], type: 'asc' }
+                ],
+                correctIndex: 1
+            }
+        ];
+
+        // Set 2 Questions
+        const questionsSet2 = [
+            {
+                id: 1,
+                options: [
+                    { nums: [5, 4, 3, 2], type: 'desc' },
+                    { nums: [9, 8, 7, 6], type: 'desc' },
+                    { nums: [12, 13, 14, 15], type: 'asc' }, // Different (順數)
+                    { nums: [20, 19, 18, 17], type: 'desc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 2,
+                options: [
+                    { nums: [1, 2, 3, 4], type: 'asc' },
+                    { nums: [6, 7, 9, 8], type: 'error' }, // Different (亂跳)
+                    { nums: [11, 12, 13, 14], type: 'asc' },
+                    { nums: [16, 17, 18, 19], type: 'asc' }
+                ],
+                correctIndex: 1
+            },
+            {
+                id: 3,
+                options: [
+                    { nums: [8, 7, 6, 5], type: 'desc' },
+                    { nums: [12, 11, 10, 9], type: 'desc' },
+                    { nums: [3, 4, 5, 6], type: 'asc' }, // Different (順數)
+                    { nums: [19, 18, 17, 16], type: 'desc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 4,
+                options: [
+                    { nums: [2, 3, 4, 5], type: 'asc' },
+                    { nums: [7, 8, 9, 10], type: 'asc' },
+                    { nums: [13, 14, 15, 16], type: 'asc' },
+                    { nums: [18, 17, 16, 15], type: 'desc' } // Different (倒數)
+                ],
+                correctIndex: 3
+            },
+            {
+                id: 5,
+                options: [
+                    { nums: [10, 9, 8, 7], type: 'desc' },
+                    { nums: [5, 3, 4, 2], type: 'error' }, // Different (亂跳)
+                    { nums: [15, 14, 13, 12], type: 'desc' },
+                    { nums: [4, 3, 2, 1], type: 'desc' }
+                ],
+                correctIndex: 1
+            },
+            {
+                id: 6,
+                options: [
+                    { nums: [14, 15, 16, 17], type: 'asc' },
+                    { nums: [5, 6, 7, 8], type: 'asc' },
+                    { nums: [9, 10, 11, 12], type: 'asc' },
+                    { nums: [3, 2, 1, 0], type: 'desc' } // Different (倒數)
+                ],
+                correctIndex: 3
+            },
+            {
+                id: 7,
+                options: [
+                    { nums: [17, 18, 19, 20], type: 'asc' },
+                    { nums: [11, 13, 12, 14], type: 'error' }, // Different (亂跳)
+                    { nums: [1, 2, 3, 4], type: 'asc' },
+                    { nums: [6, 7, 8, 9], type: 'asc' }
+                ],
+                correctIndex: 1
+            },
+            {
+                id: 8,
+                options: [
+                    { nums: [20, 19, 18, 17], type: 'desc' },
+                    { nums: [9, 8, 7, 6], type: 'desc' },
+                    { nums: [12, 13, 14, 15], type: 'asc' }, // Different (順數)
+                    { nums: [4, 3, 2, 1], type: 'desc' }
+                ],
+                correctIndex: 2
+            },
+            {
+                id: 9,
+                options: [
+                    { nums: [2, 3, 4, 5], type: 'asc' },
+                    { nums: [7, 6, 5, 4], type: 'desc' }, // Different (倒數)
+                    { nums: [10, 11, 12, 13], type: 'asc' },
+                    { nums: [16, 17, 18, 19], type: 'asc' }
+                ],
+                correctIndex: 1
+            },
+            {
+                id: 10,
+                options: [
+                    { nums: [15, 14, 13, 12], type: 'desc' },
+                    { nums: [8, 7, 6, 5], type: 'desc' },
+                    { nums: [11, 10, 8, 9], type: 'error' }, // Different (亂跳)
+                    { nums: [19, 18, 17, 16], type: 'desc' }
+                ],
+                correctIndex: 2
+            }
+        ];
+
+        // State
+        let currentQuestions = [];
+        let currentQIndex = 0;
+        let isAnswering = false;
+        let currentSetId = 1;
+
+        // DOM Elements
+        const menuScreen = document.getElementById('menu-screen');
+        const gameContainer = document.getElementById('game-container');
+        const completionScreen = document.getElementById('completion-screen');
+        const optionsContainer = document.getElementById('options-container');
+        const progressBar = document.getElementById('progress');
+        const feedbackModal = document.getElementById('feedback-modal');
+        const feedbackIcon = document.getElementById('feedback-icon');
+        const feedbackText = document.getElementById('feedback-text');
+        const nextBtnAction = document.getElementById('next-btn-action');
+        const homeBtn = document.querySelector('.home-btn');
+        const headerTitle = document.getElementById('header-title');
+        
+        // Canvas Elements
+        const canvas = document.getElementById('draw-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let strokePoints = [];
+
+        function resizeCanvas() {
+            const rect = document.querySelector('.question-card').getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            // Adjust line style
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#FF0000'; // Red like teacher
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Drawing Event Listeners
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+
+        function getPoint(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function startDrawing(e) {
+            if (!isAnswering) return;
+            e.preventDefault();
+            isDrawing = true;
+            strokePoints = [];
+            const pt = getPoint(e);
+            strokePoints.push(pt);
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y);
+        }
+
+        function draw(e) {
+            if (!isDrawing || !isAnswering) return;
+            e.preventDefault();
+            const pt = getPoint(e);
+            strokePoints.push(pt);
+            ctx.lineTo(pt.x, pt.y);
+            ctx.stroke();
+        }
+
+        function stopDrawing(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            ctx.closePath();
+            
+            if (strokePoints.length > 5) { // Ignore tiny taps
+                detectSelection();
+            } else {
+                // Fade out accidental dots
+                setTimeout(clearCanvas, 500);
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function detectSelection() {
+            if (!isAnswering) return;
+
+            // Calculate bounding box of the stroke
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            strokePoints.forEach(p => {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            });
+
+            const strokeCenter = {
+                x: (minX + maxX) / 2,
+                y: (minY + maxY) / 2
+            };
+
+            const strokeWidth = maxX - minX;
+            const strokeHeight = maxY - minY;
+
+            // Find which option was circled
+            // We check if the stroke center is roughly inside an option button
+            // Or if the stroke bounding box overlaps significantly
+            
+            const options = document.querySelectorAll('.option-btn');
+            let selectedIndex = -1;
+
+            options.forEach((opt, index) => {
+                // Get option position relative to canvas
+                // Since canvas covers .question-card, we need offset relative to that
+                const cardRect = document.querySelector('.question-card').getBoundingClientRect();
+                const optRect = opt.getBoundingClientRect();
+
+                const optRel = {
+                    left: optRect.left - cardRect.left,
+                    top: optRect.top - cardRect.top,
+                    width: optRect.width,
+                    height: optRect.height
+                };
+
+                const optCenter = {
+                    x: optRel.left + optRel.width / 2,
+                    y: optRel.top + optRel.height / 2
+                };
+
+                // Heuristic 1: Stroke center is inside option
+                const centerInside = (strokeCenter.x >= optRel.left && strokeCenter.x <= optRel.left + optRel.width &&
+                                      strokeCenter.y >= optRel.top && strokeCenter.y <= optRel.top + optRel.height);
+                
+                // Heuristic 2: Overlap intersection
+                // Simple box intersection
+                const overlapX = Math.max(0, Math.min(maxX, optRel.left + optRel.width) - Math.max(minX, optRel.left));
+                const overlapY = Math.max(0, Math.min(maxY, optRel.top + optRel.height) - Math.max(minY, optRel.top));
+                const overlapArea = overlapX * overlapY;
+                const optArea = optRel.width * optRel.height;
+                
+                // Allow match if center is inside OR significant overlap (>30%)
+                if (centerInside || (overlapArea / optArea > 0.3)) {
+                    selectedIndex = index;
+                }
+            });
+
+            if (selectedIndex !== -1) {
+                // Clear drawing and select
+                // Give a split second to see their drawing
+                setTimeout(() => {
+                    clearCanvas();
+                    checkAnswer(selectedIndex, options[selectedIndex]);
+                }, 200);
+            } else {
+                // Invalid circle/draw, clear it
+                setTimeout(clearCanvas, 500);
+            }
+        }
+
+        function showMenu() {
+            menuScreen.style.display = 'flex';
+            gameContainer.style.display = 'none';
+            completionScreen.style.display = 'none';
+            homeBtn.style.display = 'none';
+            headerTitle.textContent = 'K2 數字規律遊戲';
+        }
+
+        function startGame(setId) {
+            currentSetId = setId;
+            currentQuestions = setId === 1 ? questionsSet1 : questionsSet2;
+            currentQIndex = 0;
+            
+            menuScreen.style.display = 'none';
+            completionScreen.style.display = 'none';
+            gameContainer.style.display = 'flex';
+            homeBtn.style.display = 'block';
+            
+            headerTitle.textContent = setId === 1 ? '第一組題目' : '第二組題目';
+            
+            // Wait for layout to settle to resize canvas
+            requestAnimationFrame(() => {
+                resizeCanvas();
+                loadQuestion();
+            });
+        }
+
+        function restartCurrentSet() {
+            startGame(currentSetId);
+        }
+
+        function loadQuestion() {
+            const q = currentQuestions[currentQIndex];
+            const progressPercent = ((currentQIndex) / currentQuestions.length) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+            
+            optionsContainer.innerHTML = '';
+            isAnswering = true;
+            clearCanvas();
+
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('div');
+                btn.className = 'option-btn';
+                
+                const numHTML = opt.nums.map(n => `<span>${n}</span>`).join('');
+                btn.innerHTML = numHTML;
+                
+                // Remove onclick, interaction handled by canvas
+                optionsContainer.appendChild(btn);
+            });
+            
+            resizeCanvas(); // Ensure canvas matches
+        }
+
+        function checkAnswer(selectedIndex, btnElement) {
+            if (!isAnswering) return;
+            isAnswering = false;
+
+            const correctIndex = currentQuestions[currentQIndex].correctIndex;
+            const isCorrect = selectedIndex === correctIndex;
+
+            if (isCorrect) {
+                btnElement.classList.add('correct');
+                showFeedback(true);
+                if(currentQIndex === currentQuestions.length - 1) {
+                     createConfetti();
+                }
+            } else {
+                btnElement.classList.add('wrong');
+                const correctBtn = optionsContainer.children[correctIndex];
+                setTimeout(() => correctBtn.classList.add('correct'), 500);
+                showFeedback(false);
+            }
+        }
+
+        function showFeedback(isCorrect) {
+            setTimeout(() => {
+                feedbackModal.style.display = 'flex';
+                if (isCorrect) {
+                    feedbackIcon.textContent = '⭕';
+                    feedbackIcon.style.color = '#FF0000';
+                    feedbackText.textContent = '答對了！';
+                    feedbackText.style.color = '#FF0000';
+                } else {
+                    feedbackIcon.textContent = '💪';
+                    feedbackIcon.style.color = '#4A90E2';
+                    feedbackText.textContent = '再接再厲！';
+                    feedbackText.style.color = '#333';
+                }
+            }, 1000);
+        }
+
+        nextBtnAction.onclick = () => {
+            feedbackModal.style.display = 'none';
+            currentQIndex++;
+            
+            if (currentQIndex < currentQuestions.length) {
+                loadQuestion();
+            } else {
+                showCompletion();
+            }
+        };
+
+        function showCompletion() {
+            gameContainer.style.display = 'none';
+            completionScreen.style.display = 'flex';
+            progressBar.style.width = '100%';
+            createConfetti();
+        }
+
+        function createConfetti() {
+            const colors = ['#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff'];
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => confetti.remove(), 5000);
+            }
+        }
+
+        // Start at menu
+        showMenu();
+
+    </script>
+</body>
+</html>
