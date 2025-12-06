@@ -333,6 +333,8 @@
         <h2 style="color: #333; margin-bottom: 40px;">請選擇練習題目</h2>
         <button class="menu-btn" onclick="startGame(1)">第一組題目</button>
         <button class="menu-btn" onclick="startGame(2)">第二組題目</button>
+        <button class="menu-btn" onclick="startGame(3)">第三組題目</button>
+        <button class="menu-btn" onclick="startGame(4)">第四組題目</button>
     </div>
 
     <!-- Game Screen -->
@@ -343,6 +345,7 @@
 
         <div class="question-card" id="card-area">
             <canvas id="draw-canvas"></canvas>
+            <!-- Audio Element -->
             <div class="question-title">
                 以下四組數中，有一組數的規律與其他不同，請<span style="color: #FF0000; border: 2px solid #FF0000; border-radius: 50%; padding: 0 5px;">圈出</span>不同規律的一組數。
             </div>
@@ -425,7 +428,11 @@
                     { nums: [15, 14, 13, 12], type: 'desc' }
                 ],
                 correctIndex: 2
-            },
+            }
+        ];
+
+        // Set 2 Questions
+        const questionsSet2 = [
             {
                 id: 6,
                 options: [
@@ -477,8 +484,8 @@
             }
         ];
 
-        // Set 2 Questions
-        const questionsSet2 = [
+        // Set 3 Questions
+        const questionsSet3 = [
             {
                 id: 1,
                 options: [
@@ -528,7 +535,11 @@
                     { nums: [4, 3, 2, 1], type: 'desc' }
                 ],
                 correctIndex: 1
-            },
+            }
+        ];
+
+        // Set 4 Questions
+        const questionsSet4 = [
             {
                 id: 6,
                 options: [
@@ -762,7 +773,12 @@
 
         function startGame(setId) {
             currentSetId = setId;
-            currentQuestions = setId === 1 ? questionsSet1 : questionsSet2;
+            
+            if (setId === 1) currentQuestions = questionsSet1;
+            else if (setId === 2) currentQuestions = questionsSet2;
+            else if (setId === 3) currentQuestions = questionsSet3;
+            else if (setId === 4) currentQuestions = questionsSet4;
+            
             currentQIndex = 0;
             
             menuScreen.style.display = 'none';
@@ -770,7 +786,8 @@
             gameContainer.style.display = 'flex';
             homeBtn.style.display = 'block';
             
-            headerTitle.textContent = setId === 1 ? '第一組題目' : '第二組題目';
+            const titles = ['第一組題目', '第二組題目', '第三組題目', '第四組題目'];
+            headerTitle.textContent = titles[setId - 1];
             
             // Wait for layout to settle to resize canvas
             requestAnimationFrame(() => {
@@ -783,27 +800,68 @@
             startGame(currentSetId);
         }
 
+        // Audio
+        const synth = window.speechSynthesis;
+        let isReading = false;
+        
+        function speakQuestion(callback) {
+            if (isReading) return;
+            isReading = true;
+            
+            const text = "以下四組數中，有一組數的規律與其他不同，請圈出不同規律的一組數。";
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-HK'; // Cantonese
+            utterance.rate = 0.8; // Slightly slower for kids
+            
+            utterance.onend = () => {
+                // Play second time after a short pause
+                setTimeout(() => {
+                    const utterance2 = new SpeechSynthesisUtterance(text);
+                    utterance2.lang = 'zh-HK';
+                    utterance2.rate = 0.8;
+                    
+                    utterance2.onend = () => {
+                        isReading = false;
+                        if (callback) callback();
+                    };
+                    
+                    synth.speak(utterance2);
+                }, 1000);
+            };
+            
+            synth.speak(utterance);
+        }
+
         function loadQuestion() {
             const q = currentQuestions[currentQIndex];
             const progressPercent = ((currentQIndex) / currentQuestions.length) * 100;
             progressBar.style.width = `${progressPercent}%`;
             
             optionsContainer.innerHTML = '';
-            isAnswering = true;
+            // Disable answering initially
+            isAnswering = false; 
             clearCanvas();
 
             q.options.forEach((opt, index) => {
                 const btn = document.createElement('div');
                 btn.className = 'option-btn';
+                btn.style.opacity = '0.5'; // Dimmed until ready
                 
                 const numHTML = opt.nums.map(n => `<span>${n}</span>`).join('');
                 btn.innerHTML = numHTML;
                 
-                // Remove onclick, interaction handled by canvas
                 optionsContainer.appendChild(btn);
             });
             
             resizeCanvas(); // Ensure canvas matches
+            
+            // Speak twice then enable
+            speakQuestion(() => {
+                isAnswering = true;
+                // Restore opacity
+                const btns = document.querySelectorAll('.option-btn');
+                btns.forEach(b => b.style.opacity = '1');
+            });
         }
 
         function checkAnswer(selectedIndex, btnElement) {
@@ -821,8 +879,7 @@
                 }
             } else {
                 btnElement.classList.add('wrong');
-                const correctBtn = optionsContainer.children[correctIndex];
-                setTimeout(() => correctBtn.classList.add('correct'), 500);
+                // Allow retry, do not show correct answer
                 showFeedback(false);
             }
         }
@@ -835,25 +892,32 @@
                     feedbackIcon.style.color = '#FF0000';
                     feedbackText.textContent = '答對了！';
                     feedbackText.style.color = '#FF0000';
+                    
+                    nextBtnAction.textContent = '下一題';
+                    nextBtnAction.onclick = () => {
+                        feedbackModal.style.display = 'none';
+                        currentQIndex++;
+                        
+                        if (currentQIndex < currentQuestions.length) {
+                            loadQuestion();
+                        } else {
+                            showCompletion();
+                        }
+                    };
                 } else {
                     feedbackIcon.textContent = '💪';
                     feedbackIcon.style.color = '#4A90E2';
                     feedbackText.textContent = '再接再厲！';
                     feedbackText.style.color = '#333';
+                    
+                    nextBtnAction.textContent = '再試一次';
+                    nextBtnAction.onclick = () => {
+                        feedbackModal.style.display = 'none';
+                        isAnswering = true;
+                    };
                 }
             }, 1000);
         }
-
-        nextBtnAction.onclick = () => {
-            feedbackModal.style.display = 'none';
-            currentQIndex++;
-            
-            if (currentQIndex < currentQuestions.length) {
-                loadQuestion();
-            } else {
-                showCompletion();
-            }
-        };
 
         function showCompletion() {
             gameContainer.style.display = 'none';
